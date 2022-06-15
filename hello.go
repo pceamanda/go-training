@@ -1,10 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
+	"time"
+	"strconv"
+	"io/ioutil"
 )
+
+const monitoramentos = 3
+const delay = 5
 
 func main() {
 
@@ -18,7 +27,7 @@ func main() {
 		case 1:
 			monitoring()
 		case 2:
-			fmt.Println("Exibindo Logs...")
+			printLogs()
 		case 0:
 			fmt.Println("Saindo do programa...")
 			os.Exit(0)
@@ -57,14 +66,83 @@ func menu() {
 	fmt.Println("0- Sair do Programa")
 }
 
+func getSites() []string {
+	var sites []string
+
+	file, err := os.Open("sites.txt")
+
+	if err != nil {
+        fmt.Println("Ocorreu um erro:", err)
+    }
+
+	reader := bufio.NewReader(file)
+
+	for {
+		line, err :=reader.ReadString('\n')
+		line = strings.TrimSpace(line)
+		fmt.Println(line)
+		sites = append(sites, line)
+		if err == io.EOF {
+			break
+		}
+	}
+
+	file.Close()
+
+	fmt.Println("O meu slice tem", len(sites), "itens")
+	fmt.Println("O meu slice tem capacidade para", cap(sites), "itens")
+
+	return sites
+}
+
 func monitoring() {
 	fmt.Println("Monitorando...")
-	site := "https://alura.com.br/askjdbahsbciahsbca"
+	sites := getSites()
+
+	for i := 0; i < monitoramentos; i++ {
+		for i, site := range sites {
+			fmt.Println("Testando site", i, ":", site)
+			testSite(site)
+		}
+		time.Sleep(delay * time.Second)
+		fmt.Println("")
+	}
+	fmt.Println("")
+}
+
+func testSite(site string) {
 	response, _ := http.Get(site)
-	
+
 	if response.StatusCode == 200 {
-        fmt.Println("Site:", site, "foi carregado com sucesso!")
-    } else {
-        fmt.Println("Site:", site, "está com problemas. Status Code:", response.StatusCode)
+		fmt.Println("Site:", site, "foi carregado com sucesso!")
+		log(site, true)
+	} else {
+		fmt.Println("Site:", site, "está com problemas. Status Code:", response.StatusCode)
+		log(site, false)
+	}
+}
+
+func log(site string, status bool) {
+
+    file, err := os.OpenFile("log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+
+    if err != nil {
+        fmt.Println("Ocorreu um erro:", err)
     }
+
+	file.WriteString(time.Now().Format("02/01/2006 15:04:05") + " - " + site + 
+		" - online: " + strconv.FormatBool(status) + "\n")
+
+	file.Close()
+}
+
+func printLogs() {
+
+    file, err := ioutil.ReadFile("log.txt")
+
+    if err != nil {
+        fmt.Println("Ocorreu um erro:", err)
+    }
+
+    fmt.Println(string(file))
 }
